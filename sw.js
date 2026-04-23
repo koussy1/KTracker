@@ -1,8 +1,17 @@
-const CACHE_NAME = 'ktracker-v1';
-const ASSETS = ['./', './index.html', './logo.png'];
-self.addEventListener('install', (i) => {
-  i.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS)));
+const CACHE_NAME = 'ktracker-v2';
+const ASSETS = [
+  './',
+  './index.html'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+  );
 });
-self.addEventListener('fetch', (f) => {
-  f.respondWith(caches.match(f.request).then((r) => r || fetch(f.request)));
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => response || fetch(event.request))
+  );
 });
