@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suivie Santé Selles Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #1e293b;
+            --primary: #3b82f6;
+            --nav-bg: #e2e8f0;
+            --nav-btn: #ffffff;
+            --input-bg: #ffffff;
+            --input-border: #e2e8f0;
+            --input-text: #1e293b;
+        }
+        .dark {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --text-color: #f1f5f9;
+            --primary: #60a5fa;
+            --nav-bg: #1e293b;
+            --nav-btn: #334155;
+            --input-bg: #1e293b;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background 0.3s ease;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding-bottom: 80px;
+            overflow-x: hidden;
+        }
+
+        /* Fix pour les champs de texte et options en mode clair */
+        input[type="text"], 
+        input[type="datetime-local"], 
+        select, 
+        textarea,
+        .input-styled {
+            background-color: var(--input-bg) !important;
+            color: var(--input-text) !important;
+            border: 1px solid var(--input-border) !important;
+        }
+
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+        }
+        .loader-logo {
+            font-size: 4rem;
+            color: var(--primary);
+            animation: pulse-ring 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.9); opacity: 0.5; }
+            50% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 15px var(--primary)); }
+            100% { transform: scale(0.9); opacity: 0.5; }
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-main {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+        .entry-forgotten {
+            background: rgba(148, 163, 184, 0.05) !important;
+            border: 1px dashed #94a3b8 !important;
+            opacity: 0.6;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade { animation: slideUp 0.4s ease-out forwards; }
+        
+        #nav-container { background-color: var(--nav-bg); }
+        .nav-btn-active { background-color: var(--nav-btn) !important; color: var(--primary) !important; }
+        .nav-btn-inactive { color: #94a3b8 !important; }
+
+        /* Style spécifique pour les labels de médicaments dans la modale */
+        .med-label {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-text);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="loader">
+        <div class="loader-logo">
+            <i class="fa-solid fa-heart-pulse"></i>
+        </div>
+        <div class="mt-6 text-sm font-black tracking-[0.3em] uppercase opacity-40 animate-pulse text-blue-500">Initialisation</div>
+    </div>
+
+    <div id="app" class="container mx-auto max-w-lg p-4">
+        <header class="flex justify-between items-center py-4">
+            <div>
+                <h1 class="text-xl font-black text-blue-600 dark:text-blue-400 leading-tight">Suivie Santé</h1>
+                <p class="text-[10px] uppercase tracking-tighter opacity-50">Selles Tracker</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleTorch()" class="w-10 h-10 flex items-center justify-center rounded-full glass shadow-sm active:scale-90 transition-transform">
+                    <i class="fa-solid fa-bolt-lightning text-amber-500"></i>
+                </button>
+                <button onclick="toggleTheme()" class="w-10 h-10 flex items-center justify-center rounded-full glass shadow-sm active:scale-90 transition-transform">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <nav id="nav-container" class="flex p-1 rounded-2xl mb-6 shadow-inner transition-colors">
+            <button onclick="switchTab('home')" id="tab-home" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-active shadow-sm">Accueil</button>
+            <button onclick="switchTab('calendar')" id="tab-calendar" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-inactive">Calendrier</button>
+            <button onclick="switchTab('stats')" id="tab-stats" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-inactive">Stats</button>
+        </nav>
+
+        <div id="view-home" class="space-y-6 animate-fade">
+            <div class="glass p-6 rounded-[2.5rem] shadow-xl border border-blue-500/10 text-center">
+                <div class="mb-6">
+                    <span class="text-[10px] font-bold uppercase tracking-widest opacity-40">Selles enregistrées</span>
+                    <div id="counter" class="text-6xl font-black text-slate-800 dark:text-white mt-1">0</div>
+                </div>
+                
+                <div class="space-y-6 text-left">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase opacity-40 mb-3 block text-center">Médicaments du jour</span>
+                        <div class="flex justify-center gap-2">
+                            <input type="checkbox" id="m-none" class="hidden peer/none" onchange="toggleMeds('none', 'home')">
+                            <label for="m-none" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/none:border-slate-400 peer-checked/none:bg-slate-400 peer-checked/none:text-white transition-all cursor-pointer font-bold text-xs uppercase">Rien</label>
+
+                            <input type="checkbox" id="m-forlax" class="hidden peer/forlax" onchange="toggleMeds('forlax', 'home')">
+                            <label for="m-forlax" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/forlax:border-blue-500 peer-checked/forlax:bg-blue-500 peer-checked/forlax:text-white transition-all cursor-pointer font-bold text-xs uppercase">Forlax</label>
+                            
+                            <input type="checkbox" id="m-flavon" class="hidden peer/flavon" onchange="toggleMeds('flavon', 'home')">
+                            <label for="m-flavon" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/flavon:border-blue-500 peer-checked/flavon:bg-blue-500 peer-checked/flavon:text-white transition-all cursor-pointer font-bold text-xs uppercase">Flavon</label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase opacity-40 mb-3 block text-center">État de la selle</span>
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="radio" name="cons" id="r-normal" value="Normal" class="hidden peer/n">
+                            <label for="r-normal" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/n:bg-emerald-500 peer-checked/n:text-white transition-all text-[11px] font-bold">Normal</label>
+                            <input type="radio" name="cons" id="r-molle" value="Molle" class="hidden peer/m">
+                            <label for="r-molle" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/m:bg-blue-500 peer-checked/m:text-white transition-all text-[11px] font-bold">Molle</label>
+                            <input type="radio" name="cons" id="r-diar" value="Diarrhée" class="hidden peer/di">
+                            <label for="r-diar" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/di:bg-orange-500 peer-checked/di:text-white transition-all text-[11px] font-bold">Diarrhée</label>
+                            <input type="radio" name="cons" id="r-dur" value="Dur" class="hidden peer/du">
+                            <label for="r-dur" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/du:bg-red-500 peer-checked/du:text-white transition-all text-[11px] font-bold">Dur</label>
+                            <input type="radio" name="cons" id="r-const" value="Constipation" class="hidden peer/co">
+                            <label for="r-const" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/co:bg-purple-500 peer-checked/co:text-white transition-all text-[11px] font-bold">Constip.</label>
+                        </div>
+                    </div>
+
+                    <input type="text" id="note-input" placeholder="Ajouter une note..." class="w-full p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm shadow-sm">
+                    
+                    <button onclick="addEntry()" class="w-full btn-main text-white py-5 rounded-[2rem] font-black text-lg active:scale-95 transition-all flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-plus-circle text-xl"></i> ENREGISTRER
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-[10px] font-black uppercase opacity-40 px-4">Historique Récent</h3>
+                <div id="recent-list" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div id="view-calendar" class="hidden animate-fade space-y-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-black text-xl">Archives</h2>
+                <button onclick="exportToCSV()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95">
+                    <i class="fa-solid fa-file-excel"></i> EXCEL
+                </button>
+            </div>
+            <div id="month-grid" class="grid grid-cols-2 gap-3"></div>
+            <div id="cal-detail-list" class="space-y-3 pt-4"></div>
+        </div>
+
+        <div id="view-stats" class="hidden animate-fade space-y-6">
+            <div class="flex justify-center">
+                <select id="stats-range" onchange="renderStats()" class="px-6 py-2 rounded-full font-bold text-xs shadow-sm outline-none">
+                    <option value="7">7 jours</option>
+                    <option value="30" selected>30 jours</option>
+                    <option value="all">Tout</option>
+                </select>
+            </div>
+            <div class="glass p-6 rounded-[2rem] shadow-xl">
+                <h4 class="text-[10px] font-black uppercase opacity-40 mb-4 text-center tracking-widest">Consistance</h4>
+                <div class="chart-container"><canvas id="chartConsistence"></canvas></div>
+            </div>
+            <div class="glass p-6 rounded-[2rem] shadow-xl">
+                <h4 class="text-[10px] font-black uppercase opacity-40 mb-4 text-center tracking-widest">Utilisation Médicaments</h4>
+                <div class="chart-container"><canvas id="chartMeds"></canvas></div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center">
+            <a href="mailto:koussy@gmail.com" class="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 hover:opacity-100 hover:text-blue-500 transition-all">
+                CRÉDIT KOUSSY <i class="fa-solid fa-envelope ml-1"></i>
+            </a>
+        </footer>
+    </div>
+
+    <!-- Modale d'Édition / Lecture -->
+    <div id="modal" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass w-full max-w-sm rounded-[2.5rem] p-8 space-y-6 animate-fade border border-white/10 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                    <i class="fa-solid fa-chevron-left text-blue-500"></i>
+                </button>
+                <h3 id="modal-title" class="font-black text-lg uppercase tracking-widest">DÉTAILS</h3>
+                <div class="w-10"></div>
+            </div>
+            <div id="modal-content" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Date et heure</label>
+                    <input type="datetime-local" id="edit-ts" class="w-full p-4 rounded-2xl text-sm font-bold outline-none">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Consistance</label>
+                    <select id="edit-cons" class="w-full p-4 rounded-2xl text-sm font-bold outline-none">
+                        <option value="N/A">N/A</option>
+                        <option value="Normal">Normal</option>
+                        <option value="Molle">Molle</option>
+                        <option value="Diarrhée">Diarrhée</option>
+                        <option value="Dur">Dur</option>
+                        <option value="Constipation">Constip.</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Médicaments</label>
+                    <div class="flex gap-2">
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-none">
+                            <input type="checkbox" id="edit-none" class="w-4 h-4 accent-slate-500" onchange="toggleMeds('none', 'edit')"> Rien
+                        </label>
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-forlax">
+                            <input type="checkbox" id="edit-forlax" class="w-4 h-4 accent-blue-500" onchange="toggleMeds('forlax', 'edit')"> Forlax
+                        </label>
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-flavon">
+                            <input type="checkbox" id="edit-flavon" class="w-4 h-4 accent-blue-500" onchange="toggleMeds('flavon', 'edit')"> Flavon
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Note</label>
+                    <textarea id="edit-note" placeholder="Aucune note..." class="w-full p-4 rounded-2xl text-sm h-24 outline-none resize-none"></textarea>
+                </div>
+                
+                <div id="modal-actions" class="flex gap-3 pt-4">
+                    <button onclick="deleteEntryFromModal()" class="w-14 h-14 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center active:scale-90 transition-all"><i class="fa-solid fa-trash-can text-xl"></i></button>
+                    <button onclick="saveEdit()" class="flex-1 btn-main text-white rounded-2xl font-black text-sm active:scale-95 transition-all">ENREGISTRER</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let entries = [];
+        let currentId = null;
+        let chartC = null;
+        let chartM = null;
+        let track = null;
+        let currentTab = 'home';
+
+        const COLORS = { 'Normal':'#10b981', 'Molle':'#3b82f6', 'Diarrhée':'#f97316', 'Dur':'#ef4444', 'Constipation':'#8b5cf6', 'N/A':'#94a3b8' };
+
+        window.onload = function() {
+            try {
+                const saved = localStorage.getItem('selles_data');
+                if (saved) entries = JSON.parse(saved);
+                
+                const isDark = localStorage.getItem('selles_dark') === 'true';
+                if (isDark) {
+                    document.body.classList.add('dark');
+                    document.getElementById('theme-icon').className = 'fa-solid fa-sun';
+                }
+                
+                processForgottenDays();
+                updateUI();
+
+                setTimeout(() => {
+                    const loader = document.getElementById('loader');
+                    loader.style.opacity = '0';
+                    setTimeout(() => { loader.style.visibility = 'hidden'; }, 600);
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loader').style.display = 'none';
+            }
+        };
+
+        // Fonction pour gérer l'exclusivité du bouton "Rien"
+        function toggleMeds(type, context) {
+            const prefix = context === 'home' ? 'm-' : 'edit-';
+            const none = document.getElementById(prefix + 'none');
+            const forlax = document.getElementById(prefix + 'forlax');
+            const flavon = document.getElementById(prefix + 'flavon');
+
+            if (type === 'none' && none.checked) {
+                forlax.checked = false;
+                flavon.checked = false;
+            } else if ((type === 'forlax' || type === 'flavon') && (forlax.checked || flavon.checked)) {
+                none.checked = false;
+            }
+        }
+
+        function persist() {
+            localStorage.setItem('selles_data', JSON.stringify(entries));
+            document.getElementById('counter').innerText = entries.filter(e => !e.forgotten).length;
+        }
+
+        function processForgottenDays() {
+            const real = entries.filter(e => !e.forgotten);
+            if (real.length === 0) return;
+            const latest = new Date(Math.max(...real.map(e => new Date(e.timestamp))));
+            latest.setHours(0,0,0,0);
+            const today = new Date(); today.setHours(0,0,0,0);
+            let cursor = new Date(latest);
+            cursor.setDate(cursor.getDate() + 1);
+            while (cursor < today) {
+                const dKey = cursor.toLocaleDateString();
+                if (!entries.some(e => new Date(e.timestamp).toLocaleDateString() === dKey)) {
+                    entries.push({ id: 'fog-' + cursor.getTime(), timestamp: new Date(cursor).toISOString(), cons: 'N/A', meds: [], note: 'Oubli', forgotten: true });
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        }
+
+        function addEntry() {
+            const note = document.getElementById('note-input').value;
+            const forlax = document.getElementById('m-forlax').checked;
+            const flavon = document.getElementById('m-flavon').checked;
+            const isNone = document.getElementById('m-none').checked;
+            const consEl = document.querySelector('input[name="cons"]:checked');
+            
+            if (!consEl && !forlax && !flavon && !isNone && !note) return;
+            
+            const meds = [];
+            if (forlax) meds.push('Forlax');
+            if (flavon) meds.push('Flavon');
+            if (isNone && meds.length === 0) meds.push('Aucun'); // Optionnel: stocker explicitement ou laisser vide
+            
+            const newEntry = { id: String(Date.now()), timestamp: new Date().toISOString(), cons: consEl ? consEl.value : 'N/A', meds, note: note.trim(), forgotten: false };
+            entries.unshift(newEntry);
+            
+            document.getElementById('note-input').value = '';
+            document.getElementById('m-forlax').checked = false;
+            document.getElementById('m-flavon').checked = false;
+            document.getElementById('m-none').checked = false;
+            if (consEl) consEl.checked = false;
+            persist(); updateUI();
+        }
+
+        function updateUI() {
+            renderRecent();
+            if (currentTab === 'calendar') renderMonths();
+            if (currentTab === 'stats') renderStats();
+        }
+
+        function renderRecent() {
+            const container = document.getElementById('recent-list');
+            const data = entries.slice(0, 10);
+            if (data.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center opacity-30 font-bold">Aucune donnée</div>';
+                return;
+            }
+            container.innerHTML = data.map(e => entryTemplate(e)).join('');
+        }
+
+        function entryTemplate(e) {
+            const date = new Date(e.timestamp);
+            const color = COLORS[e.cons] || '#94a3b8';
+            // On ne montre pas le badge "Aucun" s'il est présent
+            const visibleMeds = e.meds.filter(m => m !== 'Aucun');
+            return `
+                <div onclick="openModal('${e.id}')" class="glass p-4 rounded-3xl flex items-center justify-between gap-4 border-l-8 cursor-pointer active:scale-95 transition-transform ${e.forgotten ? 'entry-forgotten' : ''}" style="border-left-color: ${color}">
+                    <div class="flex-1 overflow-hidden">
+                        <div class="flex items-center gap-2">
+                            <span class="font-black text-lg">${e.forgotten ? '--:--' : date.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})}</span>
+                            <span class="text-[9px] font-bold opacity-40 uppercase">${date.toLocaleDateString('fr-FR', {day:'2-digit', month:'short'})}</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[10px] font-black uppercase" style="color: ${color}">${e.cons}</span>
+                            ${visibleMeds.map(m => `<span class="text-[8px] font-bold bg-blue-500/10 text-blue-500 px-2 rounded-md">${m}</span>`).join('')}
+                        </div>
+                    </div>
+                    ${currentTab === 'home' ? `
+                    <button onclick="event.stopPropagation(); deleteEntry('${e.id}')" class="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center active:scale-75 transition-all">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>` : `<div class="opacity-30"><i class="fa-solid fa-chevron-right"></i></div>`}
+                </div>`;
+        }
+
+        function openModal(id) {
+            currentId = id;
+            const e = entries.find(x => String(x.id) === String(id));
+            if (!e) return;
+            const d = new Date(e.timestamp);
+            
+            document.getElementById('edit-ts').value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            document.getElementById('edit-cons').value = e.cons;
+            document.getElementById('edit-forlax').checked = e.meds.includes('Forlax');
+            document.getElementById('edit-flavon').checked = e.meds.includes('Flavon');
+            document.getElementById('edit-none').checked = e.meds.includes('Aucun') || e.meds.length === 0;
+            document.getElementById('edit-note').value = e.note || "";
+
+            const isReadOnly = (currentTab !== 'home');
+            
+            document.getElementById('modal-title').innerText = isReadOnly ? 'CONSULTATION' : 'ÉDITION';
+            document.getElementById('modal-actions').style.display = isReadOnly ? 'none' : 'flex';
+            
+            document.getElementById('edit-ts').disabled = isReadOnly;
+            document.getElementById('edit-cons').disabled = isReadOnly;
+            document.getElementById('edit-forlax').disabled = isReadOnly;
+            document.getElementById('edit-flavon').disabled = isReadOnly;
+            document.getElementById('edit-none').disabled = isReadOnly;
+            document.getElementById('edit-note').disabled = isReadOnly;
+
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); currentId = null; }
+
+        function saveEdit() {
+            const idx = entries.findIndex(e => String(e.id) === String(currentId));
+            if (idx === -1) return;
+            const meds = [];
+            if (document.getElementById('edit-forlax').checked) meds.push('Forlax');
+            if (document.getElementById('edit-flavon').checked) meds.push('Flavon');
+            if (document.getElementById('edit-none').checked && meds.length === 0) meds.push('Aucun');
+            
+            entries[idx].timestamp = new Date(document.getElementById('edit-ts').value).toISOString();
+            entries[idx].cons = document.getElementById('edit-cons').value;
+            entries[idx].meds = meds;
+            entries[idx].note = document.getElementById('edit-note').value;
+            entries[idx].forgotten = false;
+            entries.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            persist(); updateUI(); closeModal();
+        }
+
+        function deleteEntry(id) { entries = entries.filter(e => String(e.id) !== String(id)); persist(); updateUI(); }
+        function deleteEntryFromModal() { if (currentId) { deleteEntry(currentId); closeModal(); } }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            ['home', 'calendar', 'stats'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-inactive";
+            });
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-active shadow-sm";
+            updateUI();
+        }
+
+        function toggleTheme() {
+            const isDark = document.body.classList.toggle('dark');
+            localStorage.setItem('selles_dark', isDark);
+            document.getElementById('theme-icon').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            if (currentTab === 'stats') renderStats();
+        }
+
+        function renderMonths() {
+            const grid = document.getElementById('month-grid');
+            const ms = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+            const yr = new Date().getFullYear();
+            grid.innerHTML = ms.map((m, i) => {
+                const count = entries.filter(e => { 
+                    const d = new Date(e.timestamp); 
+                    return d.getMonth() === i && d.getFullYear() === yr && !e.forgotten; 
+                }).length;
+                return `<div onclick="showMonthDetail(${i})" class="glass p-5 rounded-3xl text-center cursor-pointer active:scale-95 transition-all">
+                        <div class="text-[10px] font-black uppercase opacity-40">${m}</div>
+                        <div class="text-2xl font-black text-blue-600 mt-1">${count}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        function showMonthDetail(m) {
+            const detail = document.getElementById('cal-detail-list');
+            const filtered = entries.filter(e => new Date(e.timestamp).getMonth() === m);
+            if (filtered.length === 0) {
+                detail.innerHTML = '<p class="text-center opacity-30 py-8">Aucun événement ce mois-ci</p>';
+            } else {
+                detail.innerHTML = `<h3 class="text-xs font-black uppercase opacity-40 mb-3 px-2">Événements du mois</h3>` + filtered.map(e => entryTemplate(e)).join('');
+            }
+            detail.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderStats() {
+            const days = document.getElementById('stats-range').value;
+            const now = new Date();
+            const filtered = entries.filter(e => { 
+                if (e.forgotten) return false; 
+                return days === 'all' || (now - new Date(e.timestamp)) < (days * 86400000); 
+            });
+            
+            const dataC = {}; filtered.forEach(e => dataC[e.cons] = (dataC[e.cons] || 0) + 1);
+            
+            if (chartC) chartC.destroy();
+            chartC = new Chart(document.getElementById('chartConsistence'), {
+                type: 'doughnut',
+                data: { 
+                    labels: Object.keys(dataC).map(k => `${k} (${dataC[k]})`), 
+                    datasets: [{ 
+                        data: Object.values(dataC), 
+                        backgroundColor: Object.keys(dataC).map(l => COLORS[l]), 
+                        borderWidth: 0 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    cutout: '70%', 
+                    animation: { animateRotate: true, duration: 1500, easing: 'easeOutQuart' },
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom', 
+                            labels: { 
+                                color: document.body.classList.contains('dark') ? '#fff' : '#1e293b', 
+                                font: {size: 11, weight: 'bold'},
+                                padding: 15
+                            } 
+                        } 
+                    } 
+                }
+            });
+            
+            let f = 0, fl = 0; filtered.forEach(e => { if (e.meds.includes('Forlax')) f++; if (e.meds.includes('Flavon')) fl++; });
+            
+            if (chartM) chartM.destroy();
+            chartM = new Chart(document.getElementById('chartMeds'), {
+                type: 'bar',
+                data: { 
+                    labels: [`Forlax (${f})`, `Flavon (${fl})`], 
+                    datasets: [{ 
+                        data: [f, fl], 
+                        backgroundColor: ['#3b82f6', '#10b981'], 
+                        borderRadius: 12 
+                    }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    animation: { duration: 1500, easing: 'easeOutBounce' },
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { display: false },
+                            ticks: { 
+                                color: document.body.classList.contains('dark') ? '#94a3b8' : '#1e293b',
+                                font: { weight: 'bold' }
+                            } 
+                        }, 
+                        x: { 
+                            grid: { display: false },
+                            ticks: { 
+                                color: document.body.classList.contains('dark') ? '#fff' : '#1e293b',
+                                font: { weight: 'bold' }
+                            } 
+                        } 
+                    }
+                }
+            });
+        }
+
+        function exportToCSV() {
+            if (entries.length === 0) return;
+            let csv = "Date,Heure,Etat,Medicaments,Notes\n";
+            entries.forEach(e => {
+                const d = new Date(e.timestamp);
+                csv += `${d.toLocaleDateString()},${e.forgotten ? '---' : d.toLocaleTimeString()},${e.cons},${e.meds.join(';')},${(e.note || "").replace(/,/g, ' ')}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = "SuiviSelles.csv"; a.click();
+        }
+
+        async function toggleTorch() {
+            try {
+                if (!track) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    track = stream.getVideoTracks()[0];
+                }
+                const settings = track.getSettings();
+                const isOn = settings.torch || false;
+                await track.applyConstraints({ advanced: [{ torch: !isOn }] });
+            } catch (e) { }
+        }
+    </script>
+</body>
+</html>
