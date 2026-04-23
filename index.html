@@ -4,94 +4,362 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Suivie Santé Selles Tracker</title>
-    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* TES STYLES ORIGINAUX */
-        :root { --primary-color: #4A90E2; --secondary-color: #f5f7fa; --text-color: #333; --accent-color: #FF6B6B; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--secondary-color); color: var(--text-color); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 90%; max-width: 600px; background: white; margin: 20px 0; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        /* ... (Reste de tes styles) ... */
-        .btn-save { background-color: #4CAF50; color: white; padding: 15px; border-radius: 10px; width: 100%; font-size: 18px; border: none; cursor: pointer; margin-top: 20px; }
-        
-        /* AJOUT DU BOUTON FLASH DISCRET */
-        #flashBtn { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: #FFD700; border: none; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 1000; cursor: pointer; }
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #1e293b;
+            --primary: #3b82f6;
+            --nav-bg: #e2e8f0;
+            --nav-btn: #ffffff;
+            --input-bg: #ffffff;
+            --input-border: #e2e8f0;
+            --input-text: #1e293b;
+        }
+        .dark {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.8);
+            --text-color: #f1f5f9;
+            --primary: #60a5fa;
+            --nav-bg: #1e293b;
+            --nav-btn: #334155;
+            --input-bg: #1e293b;
+            --input-border: #334155;
+            --input-text: #f1f5f9;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background 0.3s ease;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding-bottom: 80px;
+            overflow-x: hidden;
+        }
+        input[type="text"], 
+        input[type="datetime-local"], 
+        select, 
+        textarea,
+        .input-styled {
+            background-color: var(--input-bg) !important;
+            color: var(--input-text) !important;
+            border: 1px solid var(--input-border) !important;
+        }
+        #loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+        }
+        .loader-logo {
+            font-size: 4rem;
+            color: var(--primary);
+            animation: pulse-ring 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.9); opacity: 0.5; }
+            50% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 15px var(--primary)); }
+            100% { transform: scale(0.9); opacity: 0.5; }
+        }
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-main {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+        }
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
+        }
+        .entry-forgotten {
+            background: rgba(148, 163, 184, 0.05) !important;
+            border: 1px dashed #94a3b8 !important;
+            opacity: 0.6;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade { animation: slideUp 0.4s ease-out forwards; }
+        #nav-container { background-color: var(--nav-bg); }
+        .nav-btn-active { background-color: var(--nav-btn) !important; color: var(--primary) !important; }
+        .nav-btn-inactive { color: #94a3b8 !important; }
+        .med-label {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-text);
+        }
     </style>
 </head>
-<body>
+<body class="min-h-screen">
 
-<button id="flashBtn" onclick="toggleFlash()">🔦</button>
-
-<div class="container">
-    <h1>Suivie Santé</h1>
-    <p>Selles Tracker</p>
-    
-    <div class="stat-card">
-        <h3>Selles enregistrées</h3>
-        <p id="totalSelles">0</p>
+    <div id="loader">
+        <div class="loader-logo">
+            <i class="fa-solid fa-heart-pulse"></i>
+        </div>
+        <div class="mt-6 text-sm font-black tracking-[0.3em] uppercase opacity-40 animate-pulse text-blue-500">Initialisation</div>
     </div>
 
-    <div class="section">
-        <h3>Médicaments du jour</h3>
-        <div class="options" id="medsOptions">
-            <button class="option-btn" data-value="Rien">Rien</button>
-            <button class="option-btn" data-value="Forlax">Forlax</button>
-            <button class="option-btn" data-value="Flavon">Flavon</button>
+    <div id="app" class="container mx-auto max-w-lg p-4">
+        <header class="flex justify-between items-center py-4">
+            <div>
+                <h1 class="text-xl font-black text-blue-600 dark:text-blue-400 leading-tight">Suivie Santé</h1>
+                <p class="text-[10px] uppercase tracking-tighter opacity-50">Selles Tracker</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleTorch()" class="w-10 h-10 flex items-center justify-center rounded-full glass shadow-sm active:scale-90 transition-transform">
+                    <i class="fa-solid fa-bolt-lightning text-amber-500"></i>
+                </button>
+                <button onclick="toggleTheme()" class="w-10 h-10 flex items-center justify-center rounded-full glass shadow-sm active:scale-90 transition-transform">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <nav id="nav-container" class="flex p-1 rounded-2xl mb-6 shadow-inner transition-colors">
+            <button onclick="switchTab('home')" id="tab-home" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-active shadow-sm">Accueil</button>
+            <button onclick="switchTab('calendar')" id="tab-calendar" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-inactive">Calendrier</button>
+            <button onclick="switchTab('stats')" id="tab-stats" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all nav-btn-inactive">Stats</button>
+        </nav>
+
+        <div id="view-home" class="space-y-6 animate-fade">
+            <div class="glass p-6 rounded-[2.5rem] shadow-xl border border-blue-500/10 text-center">
+                <div class="mb-6">
+                    <span class="text-[10px] font-bold uppercase tracking-widest opacity-40">Selles enregistrées</span>
+                    <div id="counter" class="text-6xl font-black text-slate-800 dark:text-white mt-1">0</div>
+                </div>
+                
+                <div class="space-y-6 text-left">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase opacity-40 mb-3 block text-center">Médicaments du jour</span>
+                        <div class="flex justify-center gap-2">
+                            <input type="checkbox" id="m-none" class="hidden peer/none" onchange="toggleMeds('none', 'home')">
+                            <label for="m-none" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/none:border-slate-400 peer-checked/none:bg-slate-400 peer-checked/none:text-white transition-all cursor-pointer font-bold text-xs uppercase">Rien</label>
+
+                            <input type="checkbox" id="m-forlax" class="hidden peer/forlax" onchange="toggleMeds('forlax', 'home')">
+                            <label for="m-forlax" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/forlax:border-blue-500 peer-checked/forlax:bg-blue-500 peer-checked/forlax:text-white transition-all cursor-pointer font-bold text-xs uppercase">Forlax</label>
+                            
+                            <input type="checkbox" id="m-flavon" class="hidden peer/flavon" onchange="toggleMeds('flavon', 'home')">
+                            <label for="m-flavon" class="flex-1 py-3 text-center rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked/flavon:border-blue-500 peer-checked/flavon:bg-blue-500 peer-checked/flavon:text-white transition-all cursor-pointer font-bold text-xs uppercase">Flavon</label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] font-bold uppercase opacity-40 mb-3 block text-center">État de la selle</span>
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="radio" name="cons" id="r-normal" value="Normal" class="hidden peer/n">
+                            <label for="r-normal" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/n:bg-emerald-500 peer-checked/n:text-white transition-all text-[11px] font-bold">Normal</label>
+                            <input type="radio" name="cons" id="r-molle" value="Molle" class="hidden peer/m">
+                            <label for="r-molle" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/m:bg-blue-500 peer-checked/m:text-white transition-all text-[11px] font-bold">Molle</label>
+                            <input type="radio" name="cons" id="r-diar" value="Diarrhée" class="hidden peer/di">
+                            <label for="r-diar" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/di:bg-orange-500 peer-checked/di:text-white transition-all text-[11px] font-bold">Diarrhée</label>
+                            <input type="radio" name="cons" id="r-dur" value="Dur" class="hidden peer/du">
+                            <label for="r-dur" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/du:bg-red-500 peer-checked/du:text-white transition-all text-[11px] font-bold">Dur</label>
+                            <input type="radio" name="cons" id="r-const" value="Constipation" class="hidden peer/co">
+                            <label for="r-const" class="py-3 text-center rounded-xl border border-slate-200 dark:border-slate-700 peer-checked/co:bg-purple-500 peer-checked/co:text-white transition-all text-[11px] font-bold">Constip.</label>
+                        </div>
+                    </div>
+
+                    <input type="text" id="note-input" placeholder="Ajouter une note..." class="w-full p-4 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm shadow-sm">
+                    
+                    <button onclick="addEntry()" class="w-full btn-main text-white py-5 rounded-[2rem] font-black text-lg active:scale-95 transition-all flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-plus-circle text-xl"></i> ENREGISTRER
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-[10px] font-black uppercase opacity-40 px-4">Historique Récent</h3>
+                <div id="recent-list" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <div id="view-calendar" class="hidden animate-fade space-y-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="font-black text-xl">Archives</h2>
+                <button onclick="exportToCSV()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95">
+                    <i class="fa-solid fa-file-excel"></i> EXCEL
+                </button>
+            </div>
+            <div id="month-grid" class="grid grid-cols-2 gap-3"></div>
+            <div id="cal-detail-list" class="space-y-3 pt-4"></div>
+        </div>
+
+        <div id="view-stats" class="hidden animate-fade space-y-6">
+            <div class="flex justify-center">
+                <select id="stats-range" onchange="renderStats()" class="px-6 py-2 rounded-full font-bold text-xs shadow-sm outline-none">
+                    <option value="7">7 jours</option>
+                    <option value="30" selected>30 jours</option>
+                    <option value="all">Tout</option>
+                </select>
+            </div>
+            <div class="glass p-6 rounded-[2rem] shadow-xl">
+                <h4 class="text-[10px] font-black uppercase opacity-40 mb-4 text-center tracking-widest">Consistance</h4>
+                <div class="chart-container"><canvas id="chartConsistence"></canvas></div>
+            </div>
+            <div class="glass p-6 rounded-[2rem] shadow-xl">
+                <h4 class="text-[10px] font-black uppercase opacity-40 mb-4 text-center tracking-widest">Utilisation Médicaments</h4>
+                <div class="chart-container"><canvas id="chartMeds"></canvas></div>
+            </div>
+        </div>
+
+        <footer class="mt-8 text-center">
+            <a href="mailto:koussy@gmail.com" class="text-[10px] font-bold uppercase tracking-[0.2em] opacity-30 hover:opacity-100 hover:text-blue-500 transition-all">
+                CRÉDIT KOUSSY <i class="fa-solid fa-envelope ml-1"></i>
+            </a>
+        </footer>
+    </div>
+
+    <div id="modal" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass w-full max-w-sm rounded-[2.5rem] p-8 space-y-6 animate-fade border border-white/10 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <button onclick="closeModal()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                    <i class="fa-solid fa-chevron-left text-blue-500"></i>
+                </button>
+                <h3 id="modal-title" class="font-black text-lg uppercase tracking-widest">DÉTAILS</h3>
+                <div class="w-10"></div>
+            </div>
+            <div id="modal-content" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Date et heure</label>
+                    <input type="datetime-local" id="edit-ts" class="w-full p-4 rounded-2xl text-sm font-bold outline-none">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Consistance</label>
+                    <select id="edit-cons" class="w-full p-4 rounded-2xl text-sm font-bold outline-none">
+                        <option value="N/A">N/A</option>
+                        <option value="Normal">Normal</option>
+                        <option value="Molle">Molle</option>
+                        <option value="Diarrhée">Diarrhée</option>
+                        <option value="Dur">Dur</option>
+                        <option value="Constipation">Constip.</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Médicaments</label>
+                    <div class="flex gap-2">
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-none">
+                            <input type="checkbox" id="edit-none" class="w-4 h-4 accent-slate-500" onchange="toggleMeds('none', 'edit')"> Rien
+                        </label>
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-forlax">
+                            <input type="checkbox" id="edit-forlax" class="w-4 h-4 accent-blue-500" onchange="toggleMeds('forlax', 'edit')"> Forlax
+                        </label>
+                        <label class="med-label flex-1 p-3 rounded-xl flex items-center gap-2 text-[10px] font-bold" id="label-edit-flavon">
+                            <input type="checkbox" id="edit-flavon" class="w-4 h-4 accent-blue-500" onchange="toggleMeds('flavon', 'edit')"> Flavon
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black uppercase opacity-40 ml-2">Note</label>
+                    <textarea id="edit-note" placeholder="Aucune note..." class="w-full p-4 rounded-2xl text-sm h-24 outline-none resize-none"></textarea>
+                </div>
+                
+                <div id="modal-actions" class="flex gap-3 pt-4">
+                    <button onclick="deleteEntryFromModal()" class="w-14 h-14 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center active:scale-90 transition-all"><i class="fa-solid fa-trash-can text-xl"></i></button>
+                    <button onclick="saveEdit()" class="flex-1 btn-main text-white rounded-2xl font-black text-sm active:scale-95 transition-all">ENREGISTRER</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="section">
-        <h3>État de la selle</h3>
-        <div class="options" id="typeOptions">
-            <button class="option-btn" data-value="Normal">Normal</button>
-            <button class="option-btn" data-value="Molle">Molle</button>
-            <button class="option-btn" data-value="Diarrhée">Diarrhée</button>
-            <button class="option-btn" data-value="Dur">Dur</button>
-            <button class="option-btn" data-value="Constip.">Constip.</button>
-        </div>
-    </div>
+    <script>
+        let entries = [];
+        let currentId = null;
+        let chartC = null;
+        let chartM = null;
+        let videoTrack = null; // Changé de 'track' pour éviter conflit
+        let currentTab = 'home';
 
-    <button class="btn-save" id="saveBtn">ENREGISTRER</button>
+        const COLORS = { 'Normal':'#10b981', 'Molle':'#3b82f6', 'Diarrhée':'#f97316', 'Dur':'#ef4444', 'Constipation':'#8b5cf6', 'N/A':'#94a3b8' };
 
-    <div class="section">
-        <h3>Historique Récent</h3>
-        <div id="historiqueList"></div>
-    </div>
-    
-    <div class="section">
-        <h2>Archives</h2>
-        <button class="btn-excel" id="exportBtn">EXCEL</button>
-    </div>
+        window.onload = function() {
+            try {
+                const saved = localStorage.getItem('selles_data');
+                if (saved) entries = JSON.parse(saved);
+                
+                const isDark = localStorage.getItem('selles_dark') === 'true';
+                if (isDark) {
+                    document.body.classList.add('dark');
+                    document.getElementById('theme-icon').className = 'fa-solid fa-sun';
+                }
+                
+                processForgottenDays();
+                updateUI();
 
-    <div class="footer">
-        <a href="mailto:koussy@gmail.com">CRÉDIT KOUSSY</a>
-    </div>
-</div>
+                setTimeout(() => {
+                    const loader = document.getElementById('loader');
+                    loader.style.opacity = '0';
+                    setTimeout(() => { loader.style.visibility = 'hidden'; }, 600);
+                }, 1500);
 
-<script>
-    // --- TES FONCTIONS ORIGINALES (Save, Chart, Excel) ---
-    // (Garde tes scripts d'origine ici pour la gestion des données)
-
-    // --- AJOUT DE LA LOGIQUE FLASH (CORRIGÉE) ---
-    let track = null;
-    async function toggleFlash() {
-        try {
-            if (!track) {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                track = stream.getVideoTracks()[0];
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loader').style.display = 'none';
             }
-            const caps = track.getCapabilities();
-            if (!caps.torch) return alert("Flash non supporté");
-            await track.applyConstraints({ advanced: [{ torch: !track.getSettings().torch }] });
-        } catch (e) { alert("Accès caméra requis pour le flash"); }
-    }
+        };
 
-    // --- AJOUT DU WORKER (POUR LE MODE HORS-LIGNE) ---
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js');
-    }
-</script>
+        // --- LOGIQUE DU FLASH (CORRIGÉE) ---
+        async function toggleTorch() {
+            try {
+                if (!videoTrack) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } 
+                    });
+                    videoTrack = stream.getVideoTracks()[0];
+                }
+                
+                const caps = videoTrack.getCapabilities();
+                if (!caps.torch) {
+                    alert("Flash non supporté sur cet appareil.");
+                    return;
+                }
 
-</body>
-</html>
+                const currentTorch = videoTrack.getSettings().torch;
+                await videoTrack.applyConstraints({
+                    advanced: [{ torch: !currentTorch }]
+                });
+            } catch (err) {
+                console.error(err);
+                alert("Erreur Caméra : Accès refusé ou non supporté.");
+            }
+        }
+
+        // --- SERVICE WORKER (POUR LE MODE HORS-LIGNE) ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').then(() => {
+                console.log("Offline mode activé !");
+            }).catch(err => console.log("Erreur SW:", err));
+        }
+
+        // --- RESTE DE TA LOGIQUE ORIGINALE ---
+        function toggleMeds(type, context) {
+            const prefix = context === 'home' ? 'm-' : 'edit-';
+            const none = document.getElementById(prefix + 'none');
+            const forlax = document.getElementById(prefix + 'forlax');
+            const flavon = document.getElementById(prefix + 'flavon');
+
+            if (type === 'none' && none.checked) {
+                forlax.checked = false;
+                flavon.checked = false;
+            } else if ((type === 'forlax' || type === 'flavon') && (forlax.checked || flavon.checked)) {
+                none.checked = false;
+            }
+        }
+
+        function persist() {
+            localStorage.setItem('selles_data', JSON.stringify(entries));
+            document.getElementById('counter').innerText = entries.filter(e => !e.forgotten).length;
+        }
+
+        function proces
