@@ -3,150 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KTracker - Santé</title>
+    <title>Suivie Santé Selles Tracker</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary: #2196F3; --bg: #f4f7f6; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; padding: 20px; padding-bottom: 100px; }
-        .card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
-        .btn-opt { background: #eee; border: 2px solid transparent; padding: 10px; border-radius: 10px; cursor: pointer; text-align: center; font-size: 0.9em; transition: 0.3s; }
-        .btn-opt.active { border-color: var(--primary); background: #e3f2fd; color: var(--primary); }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; margin-top: 15px; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3); }
-        .hist-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9em; }
-        #flashBtn { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: #FFD700; border: none; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1000; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #888; }
+        /* TES STYLES ORIGINAUX */
+        :root { --primary-color: #4A90E2; --secondary-color: #f5f7fa; --text-color: #333; --accent-color: #FF6B6B; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--secondary-color); color: var(--text-color); margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 90%; max-width: 600px; background: white; margin: 20px 0; padding: 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        /* ... (Reste de tes styles) ... */
+        .btn-save { background-color: #4CAF50; color: white; padding: 15px; border-radius: 10px; width: 100%; font-size: 18px; border: none; cursor: pointer; margin-top: 20px; }
+        
+        /* AJOUT DU BOUTON FLASH DISCRET */
+        #flashBtn { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: #FFD700; border: none; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 1000; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h2 style="margin-top:0">KTracker Santé</h2>
+<button id="flashBtn" onclick="toggleFlash()">🔦</button>
 
-    <div class="card">
-        <p style="margin:0">Selles enregistrées : <strong id="totalCount">0</strong></p>
+<div class="container">
+    <h1>Suivie Santé</h1>
+    <p>Selles Tracker</p>
+    
+    <div class="stat-card">
+        <h3>Selles enregistrées</h3>
+        <p id="totalSelles">0</p>
     </div>
 
-    <div class="card">
-        <label><strong>Médicaments du jour :</strong></label>
-        <div class="grid">
-            <div class="btn-opt med-opt" onclick="toggleOpt(this, 'meds')">Rien</div>
-            <div class="btn-opt med-opt" onclick="toggleOpt(this, 'meds')">Forlax</div>
-            <div class="btn-opt med-opt" onclick="toggleOpt(this, 'meds')">Flavon</div>
+    <div class="section">
+        <h3>Médicaments du jour</h3>
+        <div class="options" id="medsOptions">
+            <button class="option-btn" data-value="Rien">Rien</button>
+            <button class="option-btn" data-value="Forlax">Forlax</button>
+            <button class="option-btn" data-value="Flavon">Flavon</button>
         </div>
     </div>
 
-    <div class="card">
-        <label><strong>État de la selle :</strong></label>
-        <div class="grid">
-            <div class="btn-opt type-opt" onclick="selectOnly(this, 'types')">Normal</div>
-            <div class="btn-opt type-opt" onclick="selectOnly(this, 'types')">Molle</div>
-            <div class="btn-opt type-opt" onclick="selectOnly(this, 'types')">Diarrhée</div>
-            <div class="btn-opt type-opt" onclick="selectOnly(this, 'types')">Dur</div>
-            <div class="btn-opt type-opt" onclick="selectOnly(this, 'types')">Constip.</div>
+    <div class="section">
+        <h3>État de la selle</h3>
+        <div class="options" id="typeOptions">
+            <button class="option-btn" data-value="Normal">Normal</button>
+            <button class="option-btn" data-value="Molle">Molle</button>
+            <button class="option-btn" data-value="Diarrhée">Diarrhée</button>
+            <button class="option-btn" data-value="Dur">Dur</button>
+            <button class="option-btn" data-value="Constip.">Constip.</button>
         </div>
     </div>
 
-    <button class="btn-main" onclick="saveEntry()">ENREGISTRER</button>
+    <button class="btn-save" id="saveBtn">ENREGISTRER</button>
 
-    <div class="card" style="margin-top:20px">
+    <div class="section">
         <h3>Historique Récent</h3>
-        <div id="historyList"></div>
+        <div id="historiqueList"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Archives</h2>
+        <button class="btn-excel" id="exportBtn">EXCEL</button>
     </div>
 
-    <div class="card">
-        <h3>Statistiques</h3>
-        <canvas id="typeChart"></canvas>
+    <div class="footer">
+        <a href="mailto:koussy@gmail.com">CRÉDIT KOUSSY</a>
     </div>
+</div>
 
-    <button id="flashBtn" onclick="toggleFlash()">🔦</button>
+<script>
+    // --- TES FONCTIONS ORIGINALES (Save, Chart, Excel) ---
+    // (Garde tes scripts d'origine ici pour la gestion des données)
 
-    <footer>
-        <a href="mailto:koussy@gmail.com" style="color:#888; text-decoration:none;">CRÉDIT KOUSSY</a>
-    </footer>
-
-    <script>
-        // --- LOGIQUE CORE TRACKER ---
-        let db = JSON.parse(localStorage.getItem('ktracker_data')) || [];
-
-        function toggleOpt(el, group) { el.classList.toggle('active'); }
-        function selectOnly(el, group) {
-            document.querySelectorAll('.' + group.slice(0,-1) + '-opt').forEach(b => b.classList.remove('active'));
-            el.classList.add('active');
-        }
-
-        function saveEntry() {
-            const meds = Array.from(document.querySelectorAll('.med-opt.active')).map(b => b.innerText);
-            const type = document.querySelector('.type-opt.active')?.innerText || 'Non précisé';
-            
-            const entry = {
-                date: new Date().toLocaleString(),
-                meds: meds.length > 0 ? meds.join(', ') : 'Rien',
-                type: type
-            };
-
-            db.unshift(entry);
-            localStorage.setItem('ktracker_data', JSON.stringify(db));
-            updateUI();
-        }
-
-        function updateUI() {
-            document.getElementById('totalCount').innerText = db.length;
-            const list = document.getElementById('historyList');
-            list.innerHTML = db.slice(0, 5).map(e => `
-                <div class="hist-item">
-                    <span>${e.date}</span>
-                    <strong>${e.type}</strong>
-                </div>
-            `).join('');
-            updateChart();
-        }
-
-        let myChart;
-        function updateChart() {
-            const ctx = document.getElementById('typeChart').getContext('2d');
-            const counts = {};
-            db.forEach(e => counts[e.type] = (counts[e.type] || 0) + 1);
-
-            if(myChart) myChart.destroy();
-            myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(counts),
-                    datasets: [{ data: Object.values(counts), backgroundColor: ['#2196F3', '#FFC107', '#F44336', '#4CAF50', '#9C27B0'] }]
-                }
-            });
-        }
-
-        // --- LOGIQUE DU FLASH ---
-        let track = null;
-        async function toggleFlash() {
-            try {
-                if (!track) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'environment' } 
-                    });
-                    track = stream.getVideoTracks()[0];
-                }
-                const capabilities = track.getCapabilities();
-                if (!capabilities.torch) {
-                    alert("Flash non supporté");
-                    return;
-                }
-                const currentTorch = track.getSettings().torch;
-                await track.applyConstraints({ advanced: [{ torch: !currentTorch }] });
-            } catch (e) {
-                alert("Erreur Caméra : Veuillez autoriser l'accès.");
+    // --- AJOUT DE LA LOGIQUE FLASH (CORRIGÉE) ---
+    let track = null;
+    async function toggleFlash() {
+        try {
+            if (!track) {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                track = stream.getVideoTracks()[0];
             }
-        }
+            const caps = track.getCapabilities();
+            if (!caps.torch) return alert("Flash non supporté");
+            await track.applyConstraints({ advanced: [{ torch: !track.getSettings().torch }] });
+        } catch (e) { alert("Accès caméra requis pour le flash"); }
+    }
 
-        // --- SERVICE WORKER (OFFLINE) ---
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(console.error);
-        }
+    // --- AJOUT DU WORKER (POUR LE MODE HORS-LIGNE) ---
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js');
+    }
+</script>
 
-        updateUI();
-    </script>
 </body>
 </html>
